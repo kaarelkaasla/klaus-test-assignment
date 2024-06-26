@@ -1,0 +1,45 @@
+syntax = "proto3";
+
+package com.kaarelkaasla.klaustestassignment;
+
+import "common.proto";
+
+option java_multiple_files = true;
+option java_package = "com.kaarelkaasla.klaustestassignment";
+option java_outer_classname = "RatingServiceProto";
+
+// RatingService defines the gRPC service for handling rating-related operations.
+service RatingService {
+  // GetAggregatedScores retrieves aggregated scores for the specified period.
+  rpc GetAggregatedScores(AggregatedScoresRequest) returns (AggregatedScoresResponse);
+}
+
+// AggregatedScoresRequest is the request message for GetAggregatedScores.
+message AggregatedScoresRequest {
+  // Start date in ISO 8601 format (e.g., 2023-06-20T15:30:00).
+  string startDate = 1;
+
+  // End date in ISO 8601 format (e.g., 2023-07-20T15:30:00).
+  string endDate = 2;
+}
+
+// AggregatedScoresResponse is the response message for GetAggregatedScores.
+message AggregatedScoresResponse {
+  // List of category rating results.
+  repeated CategoryRatingResult categoryRatingResults = 1;
+}
+
+// CategoryRatingResult represents the result for a rating category.
+message CategoryRatingResult {
+  // Name of the category.
+  string categoryName = 1;
+
+  // Frequency of ratings for this category.
+  int32 frequency = 2;
+
+  // Overall score percentage for the category.
+  double overallAverageScorePercentage = 3;
+
+  // Scores for specific periods.
+  repeated PeriodScore periodScores = 4;
+}

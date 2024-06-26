@@ -1,0 +1,15 @@
+spring:
+  datasource:
+    url: jdbc:sqlite::resource:database.db
+    driver-class-name: org.sqlite.JDBC
+  jpa:
+    database-platform: org.hibernate.community.dialect.SQLiteDialect
+    hibernate:
+      ddl-auto: update
+api:
+  key-header: ${API_KEY_HEADER:x-api-key}
+  key: ${API_KEY:your-secret-api-key}
+grpc:
+  server:
+    host: localhost
+    port: 9090

@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package com.kaarelkaasla.klaustestassignment;
+
+option java_multiple_files = true;
+option java_package = "com.kaarelkaasla.klaustestassignment";
+option java_outer_classname = "CommonProto";
+
+// PeriodScore represents the score for a specific period.
+message PeriodScore {
+  // Period description.
+  string period = 1;
+
+  // Average score percentage for the period.
+  double averageScorePercentage = 2;
+
+  // Message indicating any errors or empty results.
+  string message = 3;
+}

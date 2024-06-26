@@ -1,0 +1,39 @@
+syntax = "proto3";
+
+package com.kaarelkaasla.klaustestassignment;
+
+import "common.proto";
+
+option java_multiple_files = true;
+option java_package = "com.kaarelkaasla.klaustestassignment";
+option java_outer_classname = "TicketScoreServiceProto";
+
+// TicketService defines the gRPC service for handling ticket-related operations.
+service TicketScoreService {
+  // GetTicketCategoryScores retrieves ticket category scores for the specified period.
+  rpc GetTicketCategoryScores(TicketCategoryScoresRequest) returns (TicketCategoryScoresResponse);
+}
+
+// TicketCategoryScoresRequest is the request message for GetTicketCategoryScores.
+message TicketCategoryScoresRequest {
+  // Start date in ISO 8601 format (e.g., 2023-06-20T15:30:00).
+  string startDate = 1;
+
+  // End date in ISO 8601 format (e.g., 2023-07-20T15:30:00).
+  string endDate = 2;
+}
+
+// TicketCategoryScoresResponse is the response message for GetTicketCategoryScores.
+message TicketCategoryScoresResponse {
+  // List of ticket category scores.
+  repeated TicketCategoryScore ticketCategoryScores = 1;
+}
+
+// TicketCategoryScore represents the category scores for a specific ticket.
+message TicketCategoryScore {
+  // Ticket ID.
+  int32 ticketId = 1;
+
+  // Map of category scores.
+  map<string, double> categoryScores = 2;
+}

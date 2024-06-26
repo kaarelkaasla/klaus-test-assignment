@@ -1,0 +1,48 @@
+syntax = "proto3";
+
+package com.kaarelkaasla.klaustestassignment;
+
+import "common.proto";
+
+option java_multiple_files = true;
+option java_package = "com.kaarelkaasla.klaustestassignment";
+option java_outer_classname = "TicketWeightedScoreProto";
+
+// TicketWeightedScoreService defines the gRPC service for handling ticket weighted score calculations.
+service TicketWeightedScoreService {
+  // GetWeightedScores calculates the weighted scores for the specified period.
+  rpc GetWeightedScores(WeightedScoresRequest) returns (WeightedScoresResponse);
+}
+
+// WeightedScoresRequest is the request message for GetWeightedScores.
+message WeightedScoresRequest {
+  // Start date in ISO 8601 format (e.g., 2023-06-20T15:30:00).
+  string startDate = 1;
+
+  // End date in ISO 8601 format (e.g., 2023-07-20T15:30:00).
+  string endDate = 2;
+
+  // Flag to include the previous period's score.
+  bool includePreviousPeriod = 3;
+}
+
+// WeightedScoresResponse is the response message for GetWeightedScores.
+message WeightedScoresResponse {
+  // Current period score details.
+  PeriodScore currentPeriodScore = 1;
+
+  // Previous period score details (optional).
+  PeriodScore previousPeriodScore = 2;
+
+  // Change in score between the current and previous period (optional).
+  ScoreChange scoreChange = 3;
+}
+
+// ScoreChange contains details about the score change.
+message ScoreChange {
+  // The change in score between periods.
+  double value = 1;
+
+  // Optional message for the score change.
+  string message = 2;
+}
