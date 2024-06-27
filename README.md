@@ -113,11 +113,11 @@ This algorithm is implemented in the [ScoreServiceImpl](https://github.com/kaare
 
   From the response the following UI representation should be possible:
 
-  | Category | Ratings | Date 1 | Date 2 | ... | Score |
-          |----|----|----|----|----|----|
-  | Tone | 1 | 30% | N/A | N/A | X% |
-  | Grammar | 2 | N/A | 90% | 100% | X% |
-  | Random | 6 | 12% | 10% | 10% | X% |
+        | Category | Ratings | Date 1 | Date 2 | ... | Score |
+        |----|----|----|----|----|----|
+        | Tone | 1 | 30% | N/A | N/A | X% |
+        | Grammar | 2 | N/A | 90% | 100% | X% |
+        | Random | 6 | 12% | 10% | 10% | X% |
 
     #### **Task 2.1: Solution**
 
