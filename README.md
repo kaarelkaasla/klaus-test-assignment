@@ -120,9 +120,9 @@ This algorithm is implemented in the [ScoreServiceImpl](https://github.com/kaare
 | Random | 6 | 12% | 10% | 10% | X% |
 
 
-    #### **Task 2.1: Solution**
+#### **Task 2.1: Solution**
 
-    This service uses a query that retrieves aggregated data from the ratings table, filtered by a specific date range (:startDate to :endDate). For each combination of date and rating_category_id, it calculates:
+This service uses a query that retrieves aggregated data from the ratings table, filtered by a specific date range (:startDate to :endDate). For each combination of date and rating_category_id, it calculates:
 
   * The count of ratings (frequency)
   * The average rating (average_rating)
