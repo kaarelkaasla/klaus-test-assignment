@@ -2,7 +2,8 @@ package com.kaarelkaasla.klaustestassignment.service;
 
 import com.kaarelkaasla.klaustestassignment.entity.RatingCategory;
 import com.kaarelkaasla.klaustestassignment.repository.RatingCategoryRepository;
-import com.kaarelkaasla.klaustestassignment.util.RatingUtils;
+import com.kaarelkaasla.klaustestassignment.util.DateUtils;
+import com.kaarelkaasla.klaustestassignment.util.MathUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import lombok.extern.slf4j.Slf4j;
@@ -59,6 +60,6 @@ public class ScoreServiceImpl implements ScoreService {
         }
 
         double score = (weightedSum / (totalWeight * 5)) * 100;
-        return RatingUtils.roundToTwoDecimalPlaces(score);
+        return MathUtils.roundToTwoDecimalPlaces(score);
     }
 }

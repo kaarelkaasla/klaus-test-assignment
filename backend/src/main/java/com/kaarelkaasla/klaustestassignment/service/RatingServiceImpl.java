@@ -2,7 +2,9 @@ package com.kaarelkaasla.klaustestassignment.service;
 
 import com.kaarelkaasla.klaustestassignment.*;
 import com.kaarelkaasla.klaustestassignment.repository.RatingRepository;
-import com.kaarelkaasla.klaustestassignment.util.RatingUtils;
+import com.kaarelkaasla.klaustestassignment.util.DateUtils;
+import com.kaarelkaasla.klaustestassignment.util.MathUtils;
+import com.kaarelkaasla.klaustestassignment.util.RatingCategoryUtils;
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
 import net.devh.boot.grpc.server.service.GrpcService;
@@ -24,12 +26,12 @@ import java.util.stream.Collectors;
 public class RatingServiceImpl extends RatingServiceGrpc.RatingServiceImplBase {
 
     private final RatingRepository ratingRepository;
-    private final RatingUtils ratingUtils;
+    private final RatingCategoryUtils ratingCategoryUtils;
 
     @Autowired
-    public RatingServiceImpl(RatingRepository ratingRepository, RatingUtils ratingUtils) {
+    public RatingServiceImpl(RatingRepository ratingRepository, RatingCategoryUtils ratingCategoryUtils) {
         this.ratingRepository = ratingRepository;
-        this.ratingUtils = ratingUtils;
+        this.ratingCategoryUtils = ratingCategoryUtils;
     }
 
     /**
@@ -50,7 +52,7 @@ public class RatingServiceImpl extends RatingServiceGrpc.RatingServiceImplBase {
             log.info("Received a gRPC request to get aggregated scores with startDate: {} and endDate: {}",
                     startDateStr, endDateStr);
 
-            if (!ratingUtils.isValidDate(startDateStr) || !ratingUtils.isValidDate(endDateStr)) {
+            if (!DateUtils.isValidDate(startDateStr) || !DateUtils.isValidDate(endDateStr)) {
                 log.warn("Invalid date format for startDate: {} or endDate: {}", startDateStr, endDateStr);
                 responseObserver
                         .onError(Status.INVALID_ARGUMENT.withDescription("Invalid date format").asRuntimeException());
@@ -59,7 +61,7 @@ public class RatingServiceImpl extends RatingServiceGrpc.RatingServiceImplBase {
 
             long daysBetween;
             try {
-                daysBetween = ratingUtils.getDaysBetween(startDateStr, endDateStr);
+                daysBetween = DateUtils.getDaysBetween(startDateStr, endDateStr);
             } catch (DateTimeParseException e) {
                 log.warn("DateTimeParseException while calculating days between dates: {}", e.getMessage());
                 responseObserver.onError(Status.INVALID_ARGUMENT.withDescription("Invalid date format").withCause(e)
@@ -69,10 +71,9 @@ public class RatingServiceImpl extends RatingServiceGrpc.RatingServiceImplBase {
 
             List<Object[]> aggregatedRatingsRaw;
             try {
-                aggregatedRatingsRaw = (daysBetween > 31
-                        || ratingUtils.isDifferentMonthOrYear(startDateStr, endDateStr))
-                                ? ratingRepository.findWeeklyAggregatedRatingsBetween(startDateStr, endDateStr)
-                                : ratingRepository.findAggregatedRatingsBetween(startDateStr, endDateStr);
+                aggregatedRatingsRaw = (daysBetween > 31 || DateUtils.isDifferentMonthOrYear(startDateStr, endDateStr))
+                        ? ratingRepository.findWeeklyAggregatedRatingsBetween(startDateStr, endDateStr)
+                        : ratingRepository.findAggregatedRatingsBetween(startDateStr, endDateStr);
             } catch (Exception e) {
                 log.error("Database query failed", e);
                 responseObserver.onError(Status.INTERNAL.withDescription("Failed to retrieve data from database")
@@ -80,7 +81,15 @@ public class RatingServiceImpl extends RatingServiceGrpc.RatingServiceImplBase {
                 return;
             }
 
-            Map<Long, String> categoryIdToNameMap = ratingUtils.getCategoryIdToNameMap();
+            // Check if the response is empty
+            if (aggregatedRatingsRaw.isEmpty()) {
+                log.info("No aggregated scores found for the given period.");
+                responseObserver.onError(Status.NOT_FOUND
+                        .withDescription("No aggregated scores found for the given period.").asRuntimeException());
+                return;
+            }
+
+            Map<Long, String> categoryIdToNameMap = ratingCategoryUtils.getCategoryIdToNameMap();
 
             Map<String, CategoryRatingResult> categoryResultsMap = processAggregatedRatings(aggregatedRatingsRaw,
                     categoryIdToNameMap, endDateStr);
@@ -136,7 +145,7 @@ public class RatingServiceImpl extends RatingServiceGrpc.RatingServiceImplBase {
         if ("Unknown Category".equals(categoryName)) {
             log.warn("Category ID {} not found in categoryIdToNameMap", categoryId);
         }
-        double averageScorePercentage = RatingUtils.roundToTwoDecimalPlaces((averageRating / 5) * 100);
+        double averageScorePercentage = MathUtils.roundToTwoDecimalPlaces((averageRating / 5) * 100);
 
         PeriodScore periodScore = PeriodScore.newBuilder().setPeriod(period)
                 .setAverageScorePercentage(averageScorePercentage).build();
@@ -182,7 +191,7 @@ public class RatingServiceImpl extends RatingServiceGrpc.RatingServiceImplBase {
         int totalFrequency = result1.getFrequency() + result2.getFrequency();
         double totalScoreSum = result1.getOverallAverageScorePercentage() * result1.getFrequency()
                 + result2.getOverallAverageScorePercentage() * result2.getFrequency();
-        double overallAverageScorePercentage = RatingUtils.roundToTwoDecimalPlaces(totalScoreSum / totalFrequency);
+        double overallAverageScorePercentage = MathUtils.roundToTwoDecimalPlaces(totalScoreSum / totalFrequency);
 
         return CategoryRatingResult.newBuilder().setCategoryName(result1.getCategoryName()).setFrequency(totalFrequency)
                 .setOverallAverageScorePercentage(overallAverageScorePercentage).addAllPeriodScores(mergedScores)

@@ -25,7 +25,10 @@ public interface RatingRepository extends JpaRepository<Rating, Long> {
      *
      * @return a list of objects arrays containing date, rating category ID, frequency, and average rating.
      */
-    @Query(value = "SELECT DATE(created_at) as date, rating_category_id, COUNT(*) as frequency, AVG(rating) as average_rating FROM ratings WHERE created_at BETWEEN :startDate AND :endDate GROUP BY DATE(created_at), rating_category_id ORDER BY DATE(created_at), rating_category_id", nativeQuery = true)
+    @Query(value = "SELECT DATE(created_at) as date, " + "rating_category_id, " + "COUNT(*) as frequency, "
+            + "AVG(rating) as average_rating " + "FROM ratings " + "WHERE created_at BETWEEN :startDate AND :endDate "
+            + "GROUP BY DATE(created_at), rating_category_id "
+            + "ORDER BY DATE(created_at), rating_category_id", nativeQuery = true)
     List<Object[]> findAggregatedRatingsBetween(String startDate, String endDate);
 
     /**
@@ -38,7 +41,10 @@ public interface RatingRepository extends JpaRepository<Rating, Long> {
      *
      * @return a list of objects arrays containing week range, rating category ID, frequency, and average rating.
      */
-    @Query(value = "SELECT MIN(DATE(created_at)) || ' to ' || CASE WHEN MAX(DATE(created_at)) > :endDate THEN :endDate ELSE MAX(DATE(created_at)) END as week_range, rating_category_id, COUNT(*) as frequency, AVG(rating) as average_rating FROM ratings WHERE created_at BETWEEN :startDate AND :endDate GROUP BY strftime('%Y-%W', created_at), rating_category_id ORDER BY MIN(DATE(created_at)), rating_category_id", nativeQuery = true)
+    @Query(value = "SELECT MIN(DATE(created_at)) || ' to ' || CASE WHEN MAX(DATE(created_at)) > :endDate THEN :endDate "
+            + "ELSE MAX(DATE(created_at)) END as week_range, rating_category_id, COUNT(*) as frequency, AVG(rating) "
+            + "as average_rating FROM ratings WHERE created_at BETWEEN :startDate AND :endDate "
+            + "GROUP BY strftime('%Y-%W', created_at), rating_category_id ORDER BY MIN(DATE(created_at)), rating_category_id", nativeQuery = true)
     List<Object[]> findWeeklyAggregatedRatingsBetween(@Param("startDate") String startDate,
             @Param("endDate") String endDate);
 
@@ -52,6 +58,7 @@ public interface RatingRepository extends JpaRepository<Rating, Long> {
      *
      * @return a list of objects arrays containing ticket ID, rating category ID, and rating.
      */
-    @Query(value = "SELECT ticket_id, rating_category_id, rating FROM ratings WHERE created_at BETWEEN :startDate AND :endDate", nativeQuery = true)
+    @Query(value = "SELECT ticket_id, rating_category_id, rating FROM ratings WHERE created_at "
+            + "BETWEEN :startDate AND :endDate", nativeQuery = true)
     List<Object[]> findRatingsWithinPeriod(String startDate, String endDate);
 }

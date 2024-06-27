@@ -4,12 +4,12 @@ import com.kaarelkaasla.klaustestassignment.*;
 import com.kaarelkaasla.klaustestassignment.entity.RatingCategory;
 import com.kaarelkaasla.klaustestassignment.repository.RatingCategoryRepository;
 import com.kaarelkaasla.klaustestassignment.repository.RatingRepository;
-import com.kaarelkaasla.klaustestassignment.util.RatingUtils;
+import com.kaarelkaasla.klaustestassignment.util.DateUtils;
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
+import lombok.extern.slf4j.Slf4j;
 import net.devh.boot.grpc.server.service.GrpcService;
 import org.springframework.beans.factory.annotation.Autowired;
-import lombok.extern.slf4j.Slf4j;
 
 import java.text.DecimalFormat;
 import java.text.ParseException;
@@ -34,22 +34,22 @@ public class TicketWeightedScoreServiceImpl extends TicketWeightedScoreServiceGr
     private final RatingRepository ratingRepository;
     private final RatingCategoryRepository ratingCategoryRepository;
     private final ScoreService scoreService;
-    private final RatingUtils ratingUtils;
+    private final DateUtils dateUtils;
 
     @Autowired
     public TicketWeightedScoreServiceImpl(RatingRepository ratingRepository,
-            RatingCategoryRepository ratingCategoryRepository, ScoreService scoreService, RatingUtils ratingUtils) {
+            RatingCategoryRepository ratingCategoryRepository, ScoreService scoreService, DateUtils dateUtils) {
         this.ratingRepository = ratingRepository;
         this.ratingCategoryRepository = ratingCategoryRepository;
         this.scoreService = scoreService;
-        this.ratingUtils = ratingUtils;
+        this.dateUtils = dateUtils;
     }
 
     /**
-     * Retrieves weighted scores for the specified period.
+     * Retrieves weighted scores for a specified period and optionally for the preceding period.
      *
      * @param request
-     *            The request containing start and end dates and a flag to include the previous period.
+     *            The request containing start and end dates and the flag to include the previous period.
      * @param responseObserver
      *            The response observer to send the weighted scores.
      */
@@ -66,8 +66,8 @@ public class TicketWeightedScoreServiceImpl extends TicketWeightedScoreServiceGr
             Date startDate;
             Date endDate;
             try {
-                startDate = ratingUtils.parseDate(startDateStr);
-                endDate = ratingUtils.parseDate(endDateStr);
+                startDate = dateUtils.parseDate(startDateStr);
+                endDate = dateUtils.parseDate(endDateStr);
             } catch (ParseException e) {
                 log.warn("Error parsing dates: {}", e.getMessage());
                 responseObserver.onError(Status.INVALID_ARGUMENT.withDescription("Invalid date format").withCause(e)
@@ -75,8 +75,8 @@ public class TicketWeightedScoreServiceImpl extends TicketWeightedScoreServiceGr
                 return;
             }
 
-            String startDateString = ratingUtils.formatDate(startDate);
-            String endDateString = ratingUtils.formatDate(endDate);
+            String startDateString = dateUtils.formatDate(startDate);
+            String endDateString = dateUtils.formatDate(endDate);
 
             double averageScore = calculateAverageScore(startDateString, endDateString);
             String currentPeriod = startDateString + " to " + endDateString;

@@ -4,10 +4,12 @@ import com.kaarelkaasla.klaustestassignment.TicketCategoryScoresRequest;
 import com.kaarelkaasla.klaustestassignment.TicketCategoryScoresResponse;
 import com.kaarelkaasla.klaustestassignment.TicketScoreServiceGrpc;
 import com.kaarelkaasla.klaustestassignment.service.TicketScoreServiceImpl;
-import com.kaarelkaasla.klaustestassignment.util.RatingUtils;
+import com.kaarelkaasla.klaustestassignment.util.DateUtils;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.grpc.Metadata;
+import io.grpc.Status;
+import io.grpc.StatusRuntimeException;
 import io.grpc.stub.MetadataUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,7 +21,6 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -27,9 +28,6 @@ import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Controller for handling ticket-related API requests.
- */
 @RestController
 @RequestMapping("/api/v1/tickets")
 @Slf4j
@@ -48,26 +46,14 @@ public class TicketScoreController {
     private String apiKey;
 
     private final TicketScoreServiceImpl ticketService;
-    private final RatingUtils ratingUtils;
+    private final DateUtils dateUtils;
 
     @Autowired
-    public TicketScoreController(TicketScoreServiceImpl ticketService, RatingUtils ratingUtils) {
+    public TicketScoreController(TicketScoreServiceImpl ticketService, DateUtils dateUtils) {
         this.ticketService = ticketService;
-        this.ratingUtils = ratingUtils;
+        this.dateUtils = dateUtils;
     }
 
-    /**
-     * Retrieves category scores for tickets created within the specified date range.
-     *
-     * @param startDate
-     *            The start date of the period in ISO 8601 format.
-     * @param endDate
-     *            The end date of the period in ISO 8601 format.
-     * @param requestApiKey
-     *            The API key for authentication.
-     *
-     * @return A list of maps containing ticket IDs and their respective category scores.
-     */
     @GetMapping("/category-scores")
     public ResponseEntity<Object> getTicketCategoryScores(@RequestParam String startDate, @RequestParam String endDate,
             @RequestHeader(value = "${api.key-header}", required = false) String requestApiKey) {
@@ -81,8 +67,8 @@ public class TicketScoreController {
         }
 
         try {
-            LocalDateTime startDateTime = ratingUtils.parseDateTime(startDate);
-            LocalDateTime endDateTime = ratingUtils.parseDateTime(endDate);
+            LocalDateTime startDateTime = dateUtils.parseDateTime(startDate);
+            LocalDateTime endDateTime = dateUtils.parseDateTime(endDate);
 
             if (startDateTime.isAfter(endDateTime)) {
                 log.warn("Start date {} is after end date {}", startDateTime, endDateTime);
@@ -119,6 +105,31 @@ public class TicketScoreController {
                 log.info("Successfully retrieved ticket category scores");
                 return ResponseEntity.ok(result);
 
+            } catch (StatusRuntimeException e) {
+                Status status = e.getStatus();
+                return switch (status.getCode()) {
+                case NOT_FOUND -> {
+                    log.info("No ratings found for the specified period.");
+                    yield ResponseEntity.status(HttpStatus.NOT_FOUND)
+                            .body("No ratings found for the specified period.");
+                }
+                case INVALID_ARGUMENT -> {
+                    log.warn("Invalid argument: {}", e.getMessage());
+                    yield ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Invalid argument.");
+                }
+                case UNAUTHENTICATED -> {
+                    log.warn("Unauthenticated request: {}", e.getMessage());
+                    yield ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Unauthenticated request.");
+                }
+                case INTERNAL -> {
+                    log.error("Internal server error: {}", e.getMessage());
+                    yield ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Internal server error.");
+                }
+                default -> {
+                    log.error("Unexpected gRPC error: {}", e.getMessage());
+                    yield ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Unexpected error.");
+                }
+                };
             } finally {
                 channel.shutdown();
                 log.debug("gRPC channel shut down");
@@ -129,7 +140,7 @@ public class TicketScoreController {
                     .body("Invalid date format. Please use the format yyyy-MM-dd'T'HH:mm:ss.");
         } catch (Exception e) {
             log.error("An unexpected error occurred", e);
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "An unexpected error occurred.", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("An unexpected error occurred.");
         }
     }
 }

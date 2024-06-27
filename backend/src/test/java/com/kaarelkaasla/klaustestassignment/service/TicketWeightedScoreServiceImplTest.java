@@ -4,7 +4,7 @@ import com.kaarelkaasla.klaustestassignment.*;
 import com.kaarelkaasla.klaustestassignment.entity.RatingCategory;
 import com.kaarelkaasla.klaustestassignment.repository.RatingCategoryRepository;
 import com.kaarelkaasla.klaustestassignment.repository.RatingRepository;
-import com.kaarelkaasla.klaustestassignment.util.RatingUtils;
+import com.kaarelkaasla.klaustestassignment.util.DateUtils;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.grpc.stub.StreamObserver;
@@ -32,20 +32,21 @@ public class TicketWeightedScoreServiceImplTest {
     @Mock
     private ScoreService scoreService;
 
-    @Mock
-    private RatingUtils ratingUtils;
-
     @InjectMocks
     private TicketWeightedScoreServiceImpl ticketWeightedScoreService;
+
+    private MockedStatic<DateUtils> dateUtilsMockedStatic;
 
     @BeforeEach
     public void setUp() {
         MockitoAnnotations.openMocks(this);
+        dateUtilsMockedStatic = mockStatic(DateUtils.class);
     }
 
     @AfterEach
     public void tearDown() {
-        Mockito.reset(ratingRepository, ratingCategoryRepository, scoreService, ratingUtils);
+        dateUtilsMockedStatic.close();
+        Mockito.reset(ratingRepository, ratingCategoryRepository, scoreService);
     }
 
     /**
@@ -58,7 +59,8 @@ public class TicketWeightedScoreServiceImplTest {
 
         StreamObserver<WeightedScoresResponse> responseObserver = mock(StreamObserver.class);
 
-        doThrow(new ParseException("Invalid date format", 0)).when(ratingUtils).parseDate("invalid-date");
+        dateUtilsMockedStatic.when(() -> DateUtils.parseDate("invalid-date"))
+                .thenThrow(new ParseException("Unparseable date: \"invalid-date\"", 0));
 
         ticketWeightedScoreService.getWeightedScores(request, responseObserver);
 
@@ -79,12 +81,12 @@ public class TicketWeightedScoreServiceImplTest {
 
         StreamObserver<WeightedScoresResponse> responseObserver = mock(StreamObserver.class);
 
-        try {
-            when(ratingUtils.parseDate(anyString())).thenReturn(new Date());
-        } catch (ParseException e) {
-            fail("Mock setup should not throw exception");
-        }
-        when(ratingUtils.formatDate(any(Date.class))).thenReturn("2023-01-01T00:00:00");
+        dateUtilsMockedStatic.when(() -> DateUtils.parseDate(anyString())).thenAnswer(invocation -> {
+            String dateStr = invocation.getArgument(0);
+            return new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss").parse(dateStr);
+        });
+
+        dateUtilsMockedStatic.when(() -> DateUtils.formatDate(any(Date.class))).thenReturn("2023-01-01T00:00:00");
         when(ratingRepository.findRatingsWithinPeriod(anyString(), anyString()))
                 .thenThrow(new RuntimeException("Database error"));
 
@@ -113,11 +115,11 @@ public class TicketWeightedScoreServiceImplTest {
         List<RatingCategory> ratingCategories = Arrays.asList(new RatingCategory(1L, "Category 1", 1.0),
                 new RatingCategory(2L, "Category 2", 1.0));
 
-        when(ratingUtils.parseDate("2023-01-01T00:00:00"))
+        dateUtilsMockedStatic.when(() -> DateUtils.parseDate("2023-01-01T00:00:00"))
                 .thenReturn(new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss").parse("2023-01-01T00:00:00"));
-        when(ratingUtils.parseDate("2023-12-31T23:59:59"))
+        dateUtilsMockedStatic.when(() -> DateUtils.parseDate("2023-12-31T23:59:59"))
                 .thenReturn(new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss").parse("2023-12-31T23:59:59"));
-        when(ratingUtils.formatDate(any(Date.class))).thenAnswer(
+        dateUtilsMockedStatic.when(() -> DateUtils.formatDate(any(Date.class))).thenAnswer(
                 invocation -> new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss").format(invocation.getArgument(0)));
         when(ratingRepository.findRatingsWithinPeriod(anyString(), anyString())).thenReturn(ratingsRaw);
         when(ratingCategoryRepository.findAll()).thenReturn(ratingCategories);
@@ -160,11 +162,11 @@ public class TicketWeightedScoreServiceImplTest {
         List<RatingCategory> ratingCategories = Arrays.asList(new RatingCategory(1L, "Category 1", 1.0),
                 new RatingCategory(2L, "Category 2", 1.0));
 
-        when(ratingUtils.parseDate("2023-01-01T00:00:00"))
+        dateUtilsMockedStatic.when(() -> DateUtils.parseDate("2023-01-01T00:00:00"))
                 .thenReturn(new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss").parse("2023-01-01T00:00:00"));
-        when(ratingUtils.parseDate("2023-12-31T23:59:59"))
+        dateUtilsMockedStatic.when(() -> DateUtils.parseDate("2023-12-31T23:59:59"))
                 .thenReturn(new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss").parse("2023-12-31T23:59:59"));
-        when(ratingUtils.formatDate(any(Date.class))).thenAnswer(
+        dateUtilsMockedStatic.when(() -> DateUtils.formatDate(any(Date.class))).thenAnswer(
                 invocation -> new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss").format(invocation.getArgument(0)));
         when(ratingRepository.findRatingsWithinPeriod(eq("2023-01-01T00:00:00"), eq("2023-12-31T23:59:59")))
                 .thenReturn(currentRatingsRaw);

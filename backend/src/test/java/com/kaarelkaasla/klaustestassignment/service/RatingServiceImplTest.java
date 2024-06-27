@@ -1,9 +1,9 @@
 package com.kaarelkaasla.klaustestassignment.service;
 
-import com.kaarelkaasla.klaustestassignment.AggregatedScoresRequest;
-import com.kaarelkaasla.klaustestassignment.AggregatedScoresResponse;
+import com.kaarelkaasla.klaustestassignment.*;
 import com.kaarelkaasla.klaustestassignment.repository.RatingRepository;
-import com.kaarelkaasla.klaustestassignment.util.RatingUtils;
+import com.kaarelkaasla.klaustestassignment.util.DateUtils;
+import com.kaarelkaasla.klaustestassignment.util.RatingCategoryUtils;
 import io.grpc.stub.StreamObserver;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -19,28 +19,29 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.Mockito.*;
 
-/**
- * Unit tests for the RatingServiceImpl class.
- */
 public class RatingServiceImplTest {
 
     @Mock
     private RatingRepository ratingRepository;
 
     @Mock
-    private RatingUtils ratingUtils;
+    private RatingCategoryUtils ratingCategoryUtils;
 
     @InjectMocks
     private RatingServiceImpl ratingService;
 
+    private MockedStatic<DateUtils> dateUtilsMockedStatic;
+
     @BeforeEach
     public void setUp() {
         MockitoAnnotations.openMocks(this);
+        dateUtilsMockedStatic = mockStatic(DateUtils.class);
     }
 
     @AfterEach
     public void tearDown() {
-        Mockito.reset(ratingRepository, ratingUtils);
+        dateUtilsMockedStatic.close();
+        Mockito.reset(ratingRepository, ratingCategoryUtils);
     }
 
     /**
@@ -49,11 +50,11 @@ public class RatingServiceImplTest {
     @Test
     public void testGetAggregatedScores_InvalidStartDate() {
         AggregatedScoresRequest request = AggregatedScoresRequest.newBuilder().setStartDate("invalid-date")
-                .setEndDate("2023-12-31").build();
+                .setEndDate("2023-12-31T23:59:59").build();
 
         StreamObserver<AggregatedScoresResponse> responseObserver = mock(StreamObserver.class);
 
-        when(ratingUtils.isValidDate("invalid-date")).thenReturn(false);
+        dateUtilsMockedStatic.when(() -> DateUtils.isValidDate("invalid-date")).thenReturn(false);
 
         ratingService.getAggregatedScores(request, responseObserver);
 
@@ -65,13 +66,13 @@ public class RatingServiceImplTest {
      */
     @Test
     public void testGetAggregatedScores_InvalidEndDate() {
-        AggregatedScoresRequest request = AggregatedScoresRequest.newBuilder().setStartDate("2023-01-01")
+        AggregatedScoresRequest request = AggregatedScoresRequest.newBuilder().setStartDate("2023-01-01T00:00:00")
                 .setEndDate("invalid-date").build();
 
         StreamObserver<AggregatedScoresResponse> responseObserver = mock(StreamObserver.class);
 
-        when(ratingUtils.isValidDate("2023-01-01")).thenReturn(true);
-        when(ratingUtils.isValidDate("invalid-date")).thenReturn(false);
+        dateUtilsMockedStatic.when(() -> DateUtils.isValidDate("2023-01-01T00:00:00")).thenReturn(true);
+        dateUtilsMockedStatic.when(() -> DateUtils.isValidDate("invalid-date")).thenReturn(false);
 
         ratingService.getAggregatedScores(request, responseObserver);
 
@@ -83,13 +84,14 @@ public class RatingServiceImplTest {
      */
     @Test
     public void testGetAggregatedScores_DateParseException() {
-        AggregatedScoresRequest request = AggregatedScoresRequest.newBuilder().setStartDate("2023-01-01")
-                .setEndDate("2023-12-31").build();
+        AggregatedScoresRequest request = AggregatedScoresRequest.newBuilder().setStartDate("2023-01-01T00:00:00")
+                .setEndDate("2023-12-31T23:59:59").build();
 
         StreamObserver<AggregatedScoresResponse> responseObserver = mock(StreamObserver.class);
 
-        when(ratingUtils.isValidDate(anyString())).thenReturn(true);
-        when(ratingUtils.getDaysBetween(anyString(), anyString())).thenThrow(DateTimeParseException.class);
+        dateUtilsMockedStatic.when(() -> DateUtils.isValidDate(anyString())).thenReturn(true);
+        dateUtilsMockedStatic.when(() -> DateUtils.getDaysBetween(anyString(), anyString()))
+                .thenThrow(DateTimeParseException.class);
 
         ratingService.getAggregatedScores(request, responseObserver);
 
@@ -101,13 +103,13 @@ public class RatingServiceImplTest {
      */
     @Test
     public void testGetAggregatedScores_DatabaseQueryException() {
-        AggregatedScoresRequest request = AggregatedScoresRequest.newBuilder().setStartDate("2023-01-01")
-                .setEndDate("2023-01-15").build();
+        AggregatedScoresRequest request = AggregatedScoresRequest.newBuilder().setStartDate("2023-01-01T00:00:00")
+                .setEndDate("2023-01-15T23:59:59").build();
 
         StreamObserver<AggregatedScoresResponse> responseObserver = mock(StreamObserver.class);
 
-        when(ratingUtils.isValidDate(anyString())).thenReturn(true);
-        when(ratingUtils.getDaysBetween(anyString(), anyString())).thenReturn(14L);
+        dateUtilsMockedStatic.when(() -> DateUtils.isValidDate(anyString())).thenReturn(true);
+        dateUtilsMockedStatic.when(() -> DateUtils.getDaysBetween(anyString(), anyString())).thenReturn(14L);
         when(ratingRepository.findAggregatedRatingsBetween(anyString(), anyString())).thenThrow(RuntimeException.class);
 
         ratingService.getAggregatedScores(request, responseObserver);
@@ -120,19 +122,19 @@ public class RatingServiceImplTest {
      */
     @Test
     public void testGetAggregatedScores_Success() {
-        AggregatedScoresRequest request = AggregatedScoresRequest.newBuilder().setStartDate("2023-01-01")
-                .setEndDate("2023-01-15").build();
+        AggregatedScoresRequest request = AggregatedScoresRequest.newBuilder().setStartDate("2023-01-01T00:00:00")
+                .setEndDate("2023-01-15T23:59:59").build();
 
         StreamObserver<AggregatedScoresResponse> responseObserver = mock(StreamObserver.class);
 
-        when(ratingUtils.isValidDate(anyString())).thenReturn(true);
-        when(ratingUtils.getDaysBetween(anyString(), anyString())).thenReturn(14L);
+        dateUtilsMockedStatic.when(() -> DateUtils.isValidDate(anyString())).thenReturn(true);
+        dateUtilsMockedStatic.when(() -> DateUtils.getDaysBetween(anyString(), anyString())).thenReturn(14L);
 
         List<Object[]> aggregatedRatingsRaw = Arrays.asList(new Object[] { "2023-01-01 to 2023-01-07", 1L, 10, 4.5 },
                 new Object[] { "2023-01-08 to 2023-01-14", 1L, 5, 3.5 });
 
         when(ratingRepository.findAggregatedRatingsBetween(anyString(), anyString())).thenReturn(aggregatedRatingsRaw);
-        when(ratingUtils.getCategoryIdToNameMap()).thenReturn(Collections.singletonMap(1L, "Category 1"));
+        when(ratingCategoryUtils.getCategoryIdToNameMap()).thenReturn(Collections.singletonMap(1L, "Category 1"));
 
         ratingService.getAggregatedScores(request, responseObserver);
 
@@ -152,21 +154,21 @@ public class RatingServiceImplTest {
      */
     @Test
     public void testGetAggregatedScores_SuccessWithDifferentMonthsOrYears() {
-        AggregatedScoresRequest request = AggregatedScoresRequest.newBuilder().setStartDate("2023-01-01")
-                .setEndDate("2023-02-15").build();
+        AggregatedScoresRequest request = AggregatedScoresRequest.newBuilder().setStartDate("2023-01-01T00:00:00")
+                .setEndDate("2023-02-15T23:59:59").build();
 
         StreamObserver<AggregatedScoresResponse> responseObserver = mock(StreamObserver.class);
 
-        when(ratingUtils.isValidDate(anyString())).thenReturn(true);
-        when(ratingUtils.getDaysBetween(anyString(), anyString())).thenReturn(45L);
-        when(ratingUtils.isDifferentMonthOrYear(anyString(), anyString())).thenReturn(true);
+        dateUtilsMockedStatic.when(() -> DateUtils.isValidDate(anyString())).thenReturn(true);
+        dateUtilsMockedStatic.when(() -> DateUtils.getDaysBetween(anyString(), anyString())).thenReturn(45L);
+        dateUtilsMockedStatic.when(() -> DateUtils.isDifferentMonthOrYear(anyString(), anyString())).thenReturn(true);
 
         List<Object[]> aggregatedRatingsRaw = Arrays.asList(new Object[] { "2023-01-01 to 2023-01-07", 1L, 10, 4.5 },
                 new Object[] { "2023-01-08 to 2023-01-14", 1L, 5, 3.5 });
 
         when(ratingRepository.findWeeklyAggregatedRatingsBetween(anyString(), anyString()))
                 .thenReturn(aggregatedRatingsRaw);
-        when(ratingUtils.getCategoryIdToNameMap()).thenReturn(Collections.singletonMap(1L, "Category 1"));
+        when(ratingCategoryUtils.getCategoryIdToNameMap()).thenReturn(Collections.singletonMap(1L, "Category 1"));
 
         ratingService.getAggregatedScores(request, responseObserver);
 
@@ -182,23 +184,43 @@ public class RatingServiceImplTest {
     }
 
     /**
+     * Tests that getAggregatedScores handles an empty result set.
+     */
+    @Test
+    public void testGetAggregatedScores_EmptyResultSet() {
+        AggregatedScoresRequest request = AggregatedScoresRequest.newBuilder().setStartDate("2023-01-01T00:00:00")
+                .setEndDate("2023-01-15T23:59:59").build();
+
+        StreamObserver<AggregatedScoresResponse> responseObserver = mock(StreamObserver.class);
+
+        dateUtilsMockedStatic.when(() -> DateUtils.isValidDate(anyString())).thenReturn(true);
+        dateUtilsMockedStatic.when(() -> DateUtils.getDaysBetween(anyString(), anyString())).thenReturn(14L);
+        when(ratingRepository.findAggregatedRatingsBetween(anyString(), anyString()))
+                .thenReturn(Collections.emptyList());
+
+        ratingService.getAggregatedScores(request, responseObserver);
+
+        verify(responseObserver).onError(any(Throwable.class));
+    }
+
+    /**
      * Tests private methods indirectly through public methods.
      */
     @Test
     public void testPrivateMethodsThroughPublicInterface() {
-        AggregatedScoresRequest request = AggregatedScoresRequest.newBuilder().setStartDate("2023-01-01")
-                .setEndDate("2023-01-15").build();
+        AggregatedScoresRequest request = AggregatedScoresRequest.newBuilder().setStartDate("2023-01-01T00:00:00")
+                .setEndDate("2023-01-15T23:59:59").build();
 
         StreamObserver<AggregatedScoresResponse> responseObserver = mock(StreamObserver.class);
 
-        when(ratingUtils.isValidDate(anyString())).thenReturn(true);
-        when(ratingUtils.getDaysBetween(anyString(), anyString())).thenReturn(14L);
+        dateUtilsMockedStatic.when(() -> DateUtils.isValidDate(anyString())).thenReturn(true);
+        dateUtilsMockedStatic.when(() -> DateUtils.getDaysBetween(anyString(), anyString())).thenReturn(14L);
 
         List<Object[]> aggregatedRatingsRaw = Arrays.asList(new Object[] { "2023-01-01 to 2023-01-07", 1L, 10, 4.5 },
                 new Object[] { "2023-01-08 to 2023-01-14", 1L, 5, 3.5 });
 
         when(ratingRepository.findAggregatedRatingsBetween(anyString(), anyString())).thenReturn(aggregatedRatingsRaw);
-        when(ratingUtils.getCategoryIdToNameMap()).thenReturn(Collections.singletonMap(1L, "Category 1"));
+        when(ratingCategoryUtils.getCategoryIdToNameMap()).thenReturn(Collections.singletonMap(1L, "Category 1"));
 
         ratingService.getAggregatedScores(request, responseObserver);
 

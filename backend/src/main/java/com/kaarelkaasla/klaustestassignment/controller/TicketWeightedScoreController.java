@@ -3,10 +3,12 @@ package com.kaarelkaasla.klaustestassignment.controller;
 import com.kaarelkaasla.klaustestassignment.TicketWeightedScoreServiceGrpc;
 import com.kaarelkaasla.klaustestassignment.WeightedScoresRequest;
 import com.kaarelkaasla.klaustestassignment.WeightedScoresResponse;
-import com.kaarelkaasla.klaustestassignment.util.RatingUtils;
+import com.kaarelkaasla.klaustestassignment.util.DateUtils;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.grpc.Metadata;
+import io.grpc.Status;
+import io.grpc.StatusRuntimeException;
 import io.grpc.stub.MetadataUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,7 +20,6 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -44,27 +45,13 @@ public class TicketWeightedScoreController {
     @Value("${api.key}")
     private String apiKey;
 
-    private final RatingUtils ratingUtils;
+    private final DateUtils dateUtils;
 
     @Autowired
-    public TicketWeightedScoreController(RatingUtils ratingUtils) {
-        this.ratingUtils = ratingUtils;
+    public TicketWeightedScoreController(DateUtils dateUtils) {
+        this.dateUtils = dateUtils;
     }
 
-    /**
-     * Retrieves weighted scores within the specified date range, optionally including the previous period.
-     *
-     * @param startDate
-     *            The start date of the period in ISO 8601 format.
-     * @param endDate
-     *            The end date of the period in ISO 8601 format.
-     * @param includePreviousPeriod
-     *            Whether to include the previous period in the response.
-     * @param requestApiKey
-     *            The API key for authentication.
-     *
-     * @return The weighted scores for the specified period.
-     */
     @GetMapping("/weighted-scores")
     public ResponseEntity<Object> getWeightedScores(@RequestParam String startDate, @RequestParam String endDate,
             @RequestParam(required = false, defaultValue = "false") String includePreviousPeriod,
@@ -88,8 +75,8 @@ public class TicketWeightedScoreController {
         }
 
         try {
-            LocalDateTime startDateTime = ratingUtils.parseDateTime(startDate);
-            LocalDateTime endDateTime = ratingUtils.parseDateTime(endDate);
+            LocalDateTime startDateTime = dateUtils.parseDateTime(startDate);
+            LocalDateTime endDateTime = dateUtils.parseDateTime(endDate);
 
             if (startDateTime.isAfter(endDateTime)) {
                 log.warn("Start date {} is after end date {}", startDateTime, endDateTime);
@@ -126,6 +113,31 @@ public class TicketWeightedScoreController {
 
                 log.info("Successfully retrieved weighted scores");
                 return ResponseEntity.ok(response);
+            } catch (StatusRuntimeException e) {
+                Status status = e.getStatus();
+                return switch (status.getCode()) {
+                case NOT_FOUND -> {
+                    log.info("No ratings found for the specified periods.");
+                    yield ResponseEntity.status(HttpStatus.NOT_FOUND)
+                            .body("No ratings found for the specified periods.");
+                }
+                case INVALID_ARGUMENT -> {
+                    log.warn("Invalid argument: {}", e.getMessage());
+                    yield ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Invalid argument.");
+                }
+                case UNAUTHENTICATED -> {
+                    log.warn("Unauthenticated request: {}", e.getMessage());
+                    yield ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Unauthenticated request.");
+                }
+                case INTERNAL -> {
+                    log.error("Internal server error: {}", e.getMessage());
+                    yield ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Internal server error.");
+                }
+                default -> {
+                    log.error("Unexpected gRPC error: {}", e.getMessage());
+                    yield ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Unexpected error.");
+                }
+                };
             } finally {
                 channel.shutdown();
                 log.debug("gRPC channel shut down");
@@ -136,7 +148,7 @@ public class TicketWeightedScoreController {
                     .body("Invalid date format. Please use the format yyyy-MM-dd'T'HH:mm:ss.");
         } catch (Exception e) {
             log.error("An unexpected error occurred", e);
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "An unexpected error occurred.", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("An unexpected error occurred.");
         }
     }
 }

@@ -4,6 +4,9 @@ import com.kaarelkaasla.klaustestassignment.*;
 import com.kaarelkaasla.klaustestassignment.entity.RatingCategory;
 import com.kaarelkaasla.klaustestassignment.repository.RatingCategoryRepository;
 import com.kaarelkaasla.klaustestassignment.repository.RatingRepository;
+import com.kaarelkaasla.klaustestassignment.util.DateUtils;
+import com.kaarelkaasla.klaustestassignment.util.MathUtils;
+import com.kaarelkaasla.klaustestassignment.util.RatingCategoryUtils;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.grpc.stub.StreamObserver;
@@ -28,6 +31,12 @@ public class TicketScoreServiceImplTest {
     @Mock
     private RatingCategoryRepository ratingCategoryRepository;
 
+    @Mock
+    private DateUtils dateUtils;
+
+    @Mock
+    private RatingCategoryUtils ratingCategoryUtils;
+
     @InjectMocks
     private TicketScoreServiceImpl ticketService;
 
@@ -41,7 +50,7 @@ public class TicketScoreServiceImplTest {
 
     @AfterEach
     public void tearDown() {
-        Mockito.reset(ratingRepository, ratingCategoryRepository);
+        Mockito.reset(ratingRepository, ratingCategoryRepository, dateUtils, ratingCategoryUtils);
     }
 
     /**
@@ -103,6 +112,7 @@ public class TicketScoreServiceImplTest {
 
         when(ratingRepository.findRatingsWithinPeriod(anyString(), anyString())).thenReturn(ratingsRaw);
         when(ratingCategoryRepository.findAll()).thenReturn(ratingCategories);
+        when(ratingCategoryUtils.getCategoryIdToNameMap()).thenReturn(Map.of(1L, "Category 1", 2L, "Category 2"));
 
         ticketService.getTicketCategoryScores(request, responseObserver);
 
@@ -126,6 +136,27 @@ public class TicketScoreServiceImplTest {
         assertNotNull(score2);
         assertEquals(100.00, score2.getCategoryScoresMap().get("Category 1"));
         assertEquals(40.00, score2.getCategoryScoresMap().get("Category 2"));
+    }
+
+    /**
+     * Tests that getTicketCategoryScores handles no ratings found for the specified period.
+     */
+    @Test
+    public void testGetTicketCategoryScores_NoRatingsFound() {
+        TicketCategoryScoresRequest request = TicketCategoryScoresRequest.newBuilder()
+                .setStartDate("2023-01-01T00:00:00").setEndDate("2023-12-31T23:59:59").build();
+
+        StreamObserver<TicketCategoryScoresResponse> responseObserver = mock(StreamObserver.class);
+
+        when(ratingRepository.findRatingsWithinPeriod(anyString(), anyString())).thenReturn(Collections.emptyList());
+
+        ticketService.getTicketCategoryScores(request, responseObserver);
+
+        ArgumentCaptor<Throwable> errorCaptor = ArgumentCaptor.forClass(Throwable.class);
+        verify(responseObserver).onError(errorCaptor.capture());
+        assertTrue(errorCaptor.getValue() instanceof StatusRuntimeException);
+        assertEquals(Status.NOT_FOUND.getCode(),
+                ((StatusRuntimeException) errorCaptor.getValue()).getStatus().getCode());
     }
 
     /**

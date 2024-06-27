@@ -1,22 +1,17 @@
 package com.kaarelkaasla.klaustestassignment.controller;
 
-import com.kaarelkaasla.klaustestassignment.*;
-import com.kaarelkaasla.klaustestassignment.util.RatingUtils;
-import io.grpc.ManagedChannel;
-import io.grpc.ManagedChannelBuilder;
-import io.grpc.Metadata;
+import com.kaarelkaasla.klaustestassignment.AggregatedScoresRequest;
+import com.kaarelkaasla.klaustestassignment.AggregatedScoresResponse;
+import com.kaarelkaasla.klaustestassignment.RatingServiceGrpc;
+import com.kaarelkaasla.klaustestassignment.util.DateUtils;
+import io.grpc.*;
 import io.grpc.stub.MetadataUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestHeader;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -30,23 +25,19 @@ import java.time.format.DateTimeParseException;
 @Slf4j
 public class RatingController {
 
+    private final DateUtils dateUtils;
     @Value("${grpc.server.host}")
     private String grpcServerHost;
-
     @Value("${grpc.server.port}")
     private int grpcServerPort;
-
     @Value("${api.key-header}")
     private String apiKeyHeader;
-
     @Value("${api.key}")
     private String apiKey;
 
-    private final RatingUtils ratingUtils;
-
     @Autowired
-    public RatingController(RatingUtils ratingUtils) {
-        this.ratingUtils = ratingUtils;
+    public RatingController(DateUtils dateUtils) {
+        this.dateUtils = dateUtils;
     }
 
     /**
@@ -61,6 +52,7 @@ public class RatingController {
      *
      * @return The aggregated scores.
      */
+
     @GetMapping("/aggregated")
     public ResponseEntity<Object> getAggregatedScores(
             @RequestHeader(value = "${api.key-header}", required = false) String requestApiKey,
@@ -75,8 +67,8 @@ public class RatingController {
         }
 
         try {
-            LocalDateTime startDateTime = ratingUtils.parseDateTime(startDate);
-            LocalDateTime endDateTime = ratingUtils.parseDateTime(endDate);
+            LocalDateTime startDateTime = dateUtils.parseDateTime(startDate);
+            LocalDateTime endDateTime = dateUtils.parseDateTime(endDate);
 
             if (startDateTime.isAfter(endDateTime)) {
                 log.warn("Start date {} is after end date {}", startDateTime, endDateTime);
@@ -101,9 +93,35 @@ public class RatingController {
                         .setEndDate(endDateTime.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)).build();
 
                 AggregatedScoresResponse response = stub.getAggregatedScores(request);
+
                 log.info("Successfully retrieved aggregated scores");
                 return ResponseEntity.ok(response);
 
+            } catch (StatusRuntimeException e) {
+                Status status = e.getStatus();
+                return switch (status.getCode()) {
+                case NOT_FOUND -> {
+                    log.info("No aggregated scores found for the given period.");
+                    yield ResponseEntity.status(HttpStatus.NOT_FOUND)
+                            .body("No aggregated scores found for the given period.");
+                }
+                case INVALID_ARGUMENT -> {
+                    log.warn("Invalid argument provided: {}", e.getMessage());
+                    yield ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Invalid argument provided.");
+                }
+                case UNAUTHENTICATED -> {
+                    log.warn("Unauthenticated request: {}", e.getMessage());
+                    yield ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Unauthenticated request.");
+                }
+                case INTERNAL -> {
+                    log.error("Internal server error: {}", e.getMessage());
+                    yield ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Internal server error.");
+                }
+                default -> {
+                    log.error("Unexpected gRPC error: {}", e.getMessage());
+                    yield ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("An unexpected error occurred.");
+                }
+                };
             } finally {
                 channel.shutdown();
                 log.debug("gRPC channel shut down");
@@ -114,7 +132,7 @@ public class RatingController {
                     .body("Invalid date format. Please use the format yyyy-MM-dd'T'HH:mm:ss.");
         } catch (Exception e) {
             log.error("An unexpected error occurred", e);
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "An unexpected error occurred.", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("An unexpected error occurred.");
         }
     }
 }
