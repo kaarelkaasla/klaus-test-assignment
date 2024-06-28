@@ -13,6 +13,9 @@ RUN npm install
 # Copy the rest of the application code
 COPY . .
 
+# Create the .env file from .env.example if it doesn't exist
+RUN if [ ! -f .env ]; then grep -v '^[[:space:]]*#' .env.example | grep -v '^[[:space:]]*$' > .env; fi
+
 # Build the app
 RUN npm run build
 
