@@ -212,13 +212,13 @@ Below are some of the ideas I would implement or consider implementing if this w
 
 # Application set-up
 
-## Local Environment
+## Local environment
 1. In the project root ```cd frontend``` and run ```npm run setup:env```. This will create the necessary ```.env``` file required for frontend to function. Alternatively you can use the ```.env.example``` file in the frontend folder to create the ```.env``` file manually.
 2. Frontend can be now run from the frontend folder by running ```npm dev run``` which will expose frontend on ```http://localhost:5173/```.
 3. In the project root ```cd backend``` and run ```mvn clean install``` (if you have Maven installed locally, ```./mvnw``` for all commands if using the plugin). This will download the necessary dependencies and generate the Java classes based on the Protobuf definitions. If for some reason ```mvn clean install``` does not work, also run ```mvn clean compile```.
 4. Backend can now be run from the backend folder by running ```mvn spring-boot:run```. This exposes the backend REST API on ```http://localhost:8080``` and the gRPC service on ```http://localhost:9090```.
 
-## Docker Environment
+## Docker environment
 1. Just navigate to the project root folder and run ```docker-compose up --build```. This will spin up both frontend and backend containers with the database access and expose the same ports as the local development, meaning frontend is available at 5173, REST API 8080, and gRPC 9090.
 2. When done, exit the docker process and use ```docker-compose down``` or simply use that command in another terminal window. This will remove now-redundant containers.
 
