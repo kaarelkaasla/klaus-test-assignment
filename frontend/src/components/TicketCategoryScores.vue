@@ -350,6 +350,7 @@ td {
   height: 100%;
   color: gray;
   font-size: 1.25rem;
+  margin-bottom: 1.5rem;
 }
 
 .table-display {
